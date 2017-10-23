@@ -11,7 +11,7 @@ output:
 ---
 ```{r setup, include=FALSE}
 knitr::knit_hooks$set(inline = function(x) { knitr:::format_sci(x, 'md')})
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 
 # This section loads necessary R libraries and sources scripts that define 
 # useful functions format_md.
@@ -31,7 +31,7 @@ if (!p_isinstalled(bindr)) p_install(bindr)
 
 # Load all of the following packages.
 # Install any missing packages.
-p_load(scales, tidyverse, stringr, janitor)
+p_load(scales, tidyverse, stringr, janitor, knitr)
 
 # This sets the default style for ggplot
 theme_set(theme_bw(base_size = 15))
@@ -40,3 +40,101 @@ theme_set(theme_bw(base_size = 15))
 source('scripts/utils.R', chdir = T)
 
 ```
+
+# Load World Data and Plot Kaya variables
+
+```{r load_world}
+world_data = read_csv('data/World.csv')
+```
+
+```{r plot_world_P}
+ggplot(world_data, aes(x = year, y= P)) +
+  geom_line() + geom_point()
+```
+
+```{r plot_world_g}
+ggplot(world_data, aes(x = year, y= g)) +
+  geom_line() + geom_point()
+```
+
+```{r plot_world_e}
+ggplot(world_data, aes(x = year, y= e)) +
+  geom_line() + geom_point()
+```
+
+```{r plot_world_f}
+ggplot(world_data, aes(x = year, y= f)) +
+  geom_line() + geom_point()
+```
+
+```{r plot_world_log_P}
+ggplot(world_data, aes(x = year, y= P)) +
+  geom_line() + geom_point() +
+  scale_y_log10()
+```
+
+```{r plot_world_log_g}
+ggplot(world_data, aes(x = year, y= g)) +
+  geom_line() + geom_point() +
+  scale_y_log10()
+```
+
+```{r plot_world_log_e}
+ggplot(world_data, aes(x = year, y= e)) +
+  geom_line() + geom_point() +
+  scale_y_log10()
+```
+
+```{r plot_world_log_f}
+ggplot(world_data, aes(x = year, y= f)) +
+  geom_line() + geom_point() + 
+  scale_y_log10()
+```
+
+
+```{r calculate_slopes}
+# average annual growth rate of per-capita GDP, in percent per year
+P_fit = lm(log(P)~ year, data = world_data)
+rate_P = summary(P_fit)$coefficients['year', 'Estimate']
+
+g_fit = lm(log(g)~ year, data = world_data)
+rate_g = summary(g_fit)$coefficients['year', 'Estimate']
+
+e_fit = lm(log(e)~ year, data = world_data)
+rate_e = summary(e_fit)$coefficients['year', 'Estimate']
+
+f_fit = lm(log(f)~ year, data = world_data)
+rate_f = summary(f_fit)$coefficients['year', 'Estimate']
+
+rates = tibble(variable = c("P", "g", "e", "f"), 
+               rate = c(rate_P, rate_g, rate_e, rate_f))
+
+kable(rates)
+
+```
+
+
+Now let's calcualte the implied rate of reduction of F: the total CO~2~ emissions?
+
+```{r emissions_reduction_rate}
+F_2005 = filter(world_data, year == 2005)$F
+F_2050 = F_2005 * (1.0 - 0.36)
+F_2016 = filter(world_data, year == 2016)$F
+
+implied_rate_F = log(F_2050 / F_2016) / (2050 - 2016)
+```
+
+The policy calls for reducing F so that F in 2050 is 36% less than it was in 2005.
+This implies that between 2016 and 2050, we have to reduce F at an average rate of
+`r format_md(implied_rate_F * 100, 2)`% per year.
+
+
+Now let's calcualte the implied rate of decarbonization of the economy.
+
+```{r calculate_implied_decarbonization}
+implied_rate_ef = implied_rate_F - (rate_P + rate_g)
+```
+The implied rate of decarbonization of the economy is
+`r format_md(100 * implied_rate_ef, 2)`% per year.
+The actual historical  rate of decarbonization is
+`r format_md(100 * (rate_e + rate_f), 2)`% per year.
